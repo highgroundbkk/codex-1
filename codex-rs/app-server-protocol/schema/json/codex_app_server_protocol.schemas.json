@@ -685,13 +685,13 @@
             },
             "method": {
               "enum": [
-                "thread/compact"
+                "thread/compact/start"
               ],
-              "title": "Thread/compactRequestMethod",
+              "title": "Thread/compact/startRequestMethod",
               "type": "string"
             },
             "params": {
-              "$ref": "#/definitions/v2/ThreadCompactParams"
+              "$ref": "#/definitions/v2/ThreadCompactStartParams"
             }
           },
           "required": [
@@ -699,7 +699,7 @@
             "method",
             "params"
           ],
-          "title": "Thread/compactRequest",
+          "title": "Thread/compact/startRequest",
           "type": "object"
         },
         {
@@ -14276,7 +14276,7 @@
         "title": "ThreadArchiveResponse",
         "type": "object"
       },
-      "ThreadCompactParams": {
+      "ThreadCompactStartParams": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "properties": {
           "threadId": {
@@ -14286,12 +14286,12 @@
         "required": [
           "threadId"
         ],
-        "title": "ThreadCompactParams",
+        "title": "ThreadCompactStartParams",
         "type": "object"
       },
-      "ThreadCompactResponse": {
+      "ThreadCompactStartResponse": {
         "$schema": "http://json-schema.org/draft-07/schema#",
-        "title": "ThreadCompactResponse",
+        "title": "ThreadCompactStartResponse",
         "type": "object"
       },
       "ThreadForkParams": {

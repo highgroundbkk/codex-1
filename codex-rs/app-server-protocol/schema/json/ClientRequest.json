@@ -2203,7 +2203,7 @@
       ],
       "type": "object"
     },
-    "ThreadCompactParams": {
+    "ThreadCompactStartParams": {
       "properties": {
         "threadId": {
           "type": "string"
@@ -3196,13 +3196,13 @@
         },
         "method": {
           "enum": [
-            "thread/compact"
+            "thread/compact/start"
           ],
-          "title": "Thread/compactRequestMethod",
+          "title": "Thread/compact/startRequestMethod",
           "type": "string"
         },
         "params": {
-          "$ref": "#/definitions/ThreadCompactParams"
+          "$ref": "#/definitions/ThreadCompactStartParams"
         }
       },
       "required": [
@@ -3210,7 +3210,7 @@
         "method",
         "params"
       ],
-      "title": "Thread/compactRequest",
+      "title": "Thread/compact/startRequest",
       "type": "object"
     },
     {

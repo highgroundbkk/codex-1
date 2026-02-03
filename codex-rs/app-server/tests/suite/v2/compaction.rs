@@ -19,8 +19,8 @@ use codex_app_server_protocol::JSONRPCError;
 use codex_app_server_protocol::JSONRPCNotification;
 use codex_app_server_protocol::JSONRPCResponse;
 use codex_app_server_protocol::RequestId;
-use codex_app_server_protocol::ThreadCompactParams;
-use codex_app_server_protocol::ThreadCompactResponse;
+use codex_app_server_protocol::ThreadCompactStartParams;
+use codex_app_server_protocol::ThreadCompactStartResponse;
 use codex_app_server_protocol::ThreadItem;
 use codex_app_server_protocol::ThreadStartParams;
 use codex_app_server_protocol::ThreadStartResponse;
@@ -200,7 +200,7 @@ async fn auto_compaction_remote_emits_started_and_completed_items() -> Result<()
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn thread_compact_triggers_compaction_and_returns_empty_response() -> Result<()> {
+async fn thread_compact_start_triggers_compaction_and_returns_empty_response() -> Result<()> {
     skip_if_no_network!(Ok(()));
 
     let server = responses::start_mock_server().await;
@@ -226,7 +226,7 @@ async fn thread_compact_triggers_compaction_and_returns_empty_response() -> Resu
 
     let thread_id = start_thread(&mut mcp).await?;
     let compact_id = mcp
-        .send_thread_compact_request(ThreadCompactParams {
+        .send_thread_compact_start_request(ThreadCompactStartParams {
             thread_id: thread_id.clone(),
         })
         .await?;
@@ -235,7 +235,8 @@ async fn thread_compact_triggers_compaction_and_returns_empty_response() -> Resu
         mcp.read_stream_until_response_message(RequestId::Integer(compact_id)),
     )
     .await??;
-    let _compact: ThreadCompactResponse = to_response::<ThreadCompactResponse>(compact_resp)?;
+    let _compact: ThreadCompactStartResponse =
+        to_response::<ThreadCompactStartResponse>(compact_resp)?;
 
     let started = wait_for_context_compaction_started(&mut mcp).await?;
     let completed = wait_for_context_compaction_completed(&mut mcp).await?;
@@ -255,7 +256,7 @@ async fn thread_compact_triggers_compaction_and_returns_empty_response() -> Resu
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn thread_compact_rejects_invalid_thread_id() -> Result<()> {
+async fn thread_compact_start_rejects_invalid_thread_id() -> Result<()> {
     skip_if_no_network!(Ok(()));
 
     let server = responses::start_mock_server().await;
@@ -274,7 +275,7 @@ async fn thread_compact_rejects_invalid_thread_id() -> Result<()> {
     timeout(DEFAULT_READ_TIMEOUT, mcp.initialize()).await??;
 
     let request_id = mcp
-        .send_thread_compact_request(ThreadCompactParams {
+        .send_thread_compact_start_request(ThreadCompactStartParams {
             thread_id: "not-a-thread-id".to_string(),
         })
         .await?;
@@ -291,7 +292,7 @@ async fn thread_compact_rejects_invalid_thread_id() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn thread_compact_rejects_unknown_thread_id() -> Result<()> {
+async fn thread_compact_start_rejects_unknown_thread_id() -> Result<()> {
     skip_if_no_network!(Ok(()));
 
     let server = responses::start_mock_server().await;
@@ -310,7 +311,7 @@ async fn thread_compact_rejects_unknown_thread_id() -> Result<()> {
     timeout(DEFAULT_READ_TIMEOUT, mcp.initialize()).await??;
 
     let request_id = mcp
-        .send_thread_compact_request(ThreadCompactParams {
+        .send_thread_compact_start_request(ThreadCompactStartParams {
             thread_id: "67e55044-10b1-426f-9247-bb680e5fe0c8".to_string(),
         })
         .await?;
