@@ -208,6 +208,10 @@ client_request_definitions! {
         params: v2::ThreadUnarchiveParams,
         response: v2::ThreadUnarchiveResponse,
     },
+    ThreadCompact => "thread/compact" {
+        params: v2::ThreadCompactParams,
+        response: v2::ThreadCompactResponse,
+    },
     ThreadRollback => "thread/rollback" {
         params: v2::ThreadRollbackParams,
         response: v2::ThreadRollbackResponse,
