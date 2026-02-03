@@ -247,7 +247,7 @@ Progress is emitted as standard `turn/*` and `item/*` notifications on the same 
 - `item/started` with `item: { "type": "contextCompaction", ... }`
 - `item/completed` with the same `contextCompaction` item id
 
-While compaction is running, the thread is effectively blocked from starting other turns, so clients should surface progress UI based on the notifications.
+While compaction is running, the thread is effectively in a turn so clients should surface progress UI based on the notifications.
 
 ```json
 { "method": "thread/compact/start", "id": 25, "params": { "threadId": "thr_b" } }
