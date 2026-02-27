@@ -3,10 +3,6 @@ use codex_core::CodexAuth;
 use codex_core::config::types::Personality;
 use codex_core::features::Feature;
 use codex_core::models_manager::manager::RefreshStrategy;
-use codex_core::protocol::AskForApproval;
-use codex_core::protocol::EventMsg;
-use codex_core::protocol::Op;
-use codex_core::protocol::SandboxPolicy;
 use codex_protocol::config_types::ReasoningSummary;
 use codex_protocol::openai_models::ConfigShellToolType;
 use codex_protocol::openai_models::InputModality;
@@ -17,6 +13,10 @@ use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::openai_models::ReasoningEffortPreset;
 use codex_protocol::openai_models::TruncationPolicyConfig;
 use codex_protocol::openai_models::default_input_modalities;
+use codex_protocol::protocol::AskForApproval;
+use codex_protocol::protocol::EventMsg;
+use codex_protocol::protocol::Op;
+use codex_protocol::protocol::SandboxPolicy;
 use codex_protocol::user_input::UserInput;
 use core_test_support::responses::ev_completed_with_tokens;
 use core_test_support::responses::ev_response_created;
@@ -29,7 +29,6 @@ use core_test_support::skip_if_no_network;
 use core_test_support::test_codex::test_codex;
 use core_test_support::wait_for_event;
 use pretty_assertions::assert_eq;
-use serde_json::Value;
 use wiremock::MockServer;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -59,7 +58,7 @@ async fn model_change_appends_model_instructions_developer_message() -> Result<(
             sandbox_policy: SandboxPolicy::new_read_only_policy(),
             model: test.session_configured.model.clone(),
             effort: test.config.model_reasoning_effort,
-            summary: ReasoningSummary::Auto,
+            summary: None,
             collaboration_mode: None,
             personality: None,
         })
@@ -92,7 +91,7 @@ async fn model_change_appends_model_instructions_developer_message() -> Result<(
             sandbox_policy: SandboxPolicy::new_read_only_policy(),
             model: next_model.to_string(),
             effort: test.config.model_reasoning_effort,
-            summary: ReasoningSummary::Auto,
+            summary: None,
             collaboration_mode: None,
             personality: None,
         })
@@ -147,7 +146,7 @@ async fn model_and_personality_change_only_appends_model_instructions() -> Resul
             sandbox_policy: SandboxPolicy::new_read_only_policy(),
             model: test.session_configured.model.clone(),
             effort: test.config.model_reasoning_effort,
-            summary: ReasoningSummary::Auto,
+            summary: None,
             collaboration_mode: None,
             personality: None,
         })
@@ -180,7 +179,7 @@ async fn model_and_personality_change_only_appends_model_instructions() -> Resul
             sandbox_policy: SandboxPolicy::new_read_only_policy(),
             model: next_model.to_string(),
             effort: test.config.model_reasoning_effort,
-            summary: ReasoningSummary::Auto,
+            summary: None,
             collaboration_mode: None,
             personality: None,
         })
@@ -229,11 +228,13 @@ async fn model_change_from_image_to_text_strips_prior_image_content() -> Result<
         supported_in_api: true,
         input_modalities: default_input_modalities(),
         prefer_websockets: false,
+        used_fallback_model_metadata: false,
         priority: 1,
         upgrade: None,
         base_instructions: "base instructions".to_string(),
         model_messages: None,
         supports_reasoning_summaries: false,
+        default_reasoning_summary: ReasoningSummary::Auto,
         support_verbosity: false,
         default_verbosity: None,
         apply_patch_tool_type: None,
@@ -266,13 +267,12 @@ async fn model_change_from_image_to_text_strips_prior_image_content() -> Result<
     let mut builder = test_codex()
         .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
         .with_config(move |config| {
-            config.features.enable(Feature::RemoteModels);
             config.model = Some(image_model_slug.to_string());
         });
     let test = builder.build(&server).await?;
     let models_manager = test.thread_manager.get_models_manager();
     let _ = models_manager
-        .list_models(&test.config, RefreshStrategy::OnlineIfUncached)
+        .list_models(RefreshStrategy::OnlineIfUncached)
         .await;
     let image_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII="
         .to_string();
@@ -294,7 +294,7 @@ async fn model_change_from_image_to_text_strips_prior_image_content() -> Result<
             sandbox_policy: SandboxPolicy::new_read_only_policy(),
             model: image_model_slug.to_string(),
             effort: test.config.model_reasoning_effort,
-            summary: ReasoningSummary::Auto,
+            summary: None,
             collaboration_mode: None,
             personality: None,
         })
@@ -313,7 +313,7 @@ async fn model_change_from_image_to_text_strips_prior_image_content() -> Result<
             sandbox_policy: SandboxPolicy::new_read_only_policy(),
             model: text_model_slug.to_string(),
             effort: test.config.model_reasoning_effort,
-            summary: ReasoningSummary::Auto,
+            summary: None,
             collaboration_mode: None,
             personality: None,
         })
@@ -324,32 +324,14 @@ async fn model_change_from_image_to_text_strips_prior_image_content() -> Result<
     assert_eq!(requests.len(), 2, "expected two model requests");
 
     let first_request = requests.first().expect("expected first request");
-    let first_has_input_image = first_request.inputs_of_type("message").iter().any(|item| {
-        item.get("content")
-            .and_then(Value::as_array)
-            .is_some_and(|content| {
-                content
-                    .iter()
-                    .any(|span| span.get("type").and_then(Value::as_str) == Some("input_image"))
-            })
-    });
     assert!(
-        first_has_input_image,
+        !first_request.message_input_image_urls("user").is_empty(),
         "first request should include the uploaded image"
     );
 
     let second_request = requests.last().expect("expected second request");
-    let second_has_input_image = second_request.inputs_of_type("message").iter().any(|item| {
-        item.get("content")
-            .and_then(Value::as_array)
-            .is_some_and(|content| {
-                content
-                    .iter()
-                    .any(|span| span.get("type").and_then(Value::as_str) == Some("input_image"))
-            })
-    });
     assert!(
-        !second_has_input_image,
+        second_request.message_input_image_urls("user").is_empty(),
         "second request should strip unsupported image content"
     );
     let second_user_texts = second_request.message_input_texts("user");
@@ -404,11 +386,13 @@ async fn model_switch_to_smaller_model_updates_token_context_window() -> Result<
         supported_in_api: true,
         input_modalities: default_input_modalities(),
         prefer_websockets: false,
+        used_fallback_model_metadata: false,
         priority: 1,
         upgrade: None,
         base_instructions: "base instructions".to_string(),
         model_messages: None,
         supports_reasoning_summaries: false,
+        default_reasoning_summary: ReasoningSummary::Auto,
         support_verbosity: false,
         default_verbosity: None,
         apply_patch_tool_type: None,
@@ -451,15 +435,12 @@ async fn model_switch_to_smaller_model_updates_token_context_window() -> Result<
     let mut builder = test_codex()
         .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
         .with_config(|config| {
-            config.features.enable(Feature::RemoteModels);
             config.model = Some(large_model_slug.to_string());
         });
     let test = builder.build(&server).await?;
 
     let models_manager = test.thread_manager.get_models_manager();
-    let available_models = models_manager
-        .list_models(&test.config, RefreshStrategy::Online)
-        .await;
+    let available_models = models_manager.list_models(RefreshStrategy::Online).await;
     assert!(
         available_models
             .iter()
@@ -490,7 +471,7 @@ async fn model_switch_to_smaller_model_updates_token_context_window() -> Result<
             sandbox_policy: SandboxPolicy::new_read_only_policy(),
             model: large_model_slug.to_string(),
             effort: test.config.model_reasoning_effort,
-            summary: ReasoningSummary::Auto,
+            summary: None,
             collaboration_mode: None,
             personality: None,
         })
@@ -545,7 +526,7 @@ async fn model_switch_to_smaller_model_updates_token_context_window() -> Result<
             sandbox_policy: SandboxPolicy::new_read_only_policy(),
             model: smaller_model_slug.to_string(),
             effort: test.config.model_reasoning_effort,
-            summary: ReasoningSummary::Auto,
+            summary: None,
             collaboration_mode: None,
             personality: None,
         })
